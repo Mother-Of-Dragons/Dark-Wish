@@ -603,6 +603,7 @@ struct move_data gBattleMoves[] = {
     .pp = 0,
     .type = TYPE_NONE,
     .procs = &basic_proc,
+	.animation = (u8*)&PoundAnimation,
     },
 
     {
