@@ -632,6 +632,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_FIGHTING,
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET,
     .procs = &basic_proc,
+    .animation = (u8*)&KaratechopAnimation,
     },
 
     {
@@ -646,6 +647,7 @@ struct move_data gBattleMoves[] = {
     .multi_hit = {2, 5},
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET,
     .procs = &basic_proc,
+    .animation = (u8*)&DoubleSlapAnimation,
     },
 
     {
@@ -660,6 +662,7 @@ struct move_data gBattleMoves[] = {
     .multi_hit = {2, 5},
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET | FLAG_PUNCH,
     .procs = &basic_proc,
+    .animation = (u8*)&CometpunchAnimation,
     },
 
     {
@@ -673,6 +676,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_NORMAL,
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET | FLAG_PUNCH,
     .procs = &basic_proc,
+    .animation = (u8*)&MegapunchAnimation,
     },
 
     {
@@ -700,6 +704,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_FIRE,
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET | FLAG_PUNCH,
     .procs = &burn_10_procs,
+    .animation = (u8*)&FirepunchAnimation,
     },
 
     {
@@ -713,6 +718,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_ICE,
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET | FLAG_PUNCH,
     .procs = &freeze_10_procs,
+    .animation = (u8*)&IcepunchAnimation,
     },
 
     {
@@ -726,6 +732,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_ELECTRIC,
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET | FLAG_PUNCH,
     .procs = &paralyze_10_procs,
+    .animation = (u8*)&ThunderpunchAnimation,
     },
 
     {
@@ -752,6 +759,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_NORMAL,
     .m_flags = FLAG_CONTACT | FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET,
     .procs = &basic_proc,
+    .animation = (u8*)&VicegripAnimation,
     },
 
     {
@@ -1345,6 +1353,7 @@ struct move_data gBattleMoves[] = {
     .type = TYPE_WATER,
     .m_flags = FLAG_MIRROR | FLAG_PROTECT | FLAG_TARGET,
     .procs = &basic_proc,
+    .animation = (u8*)&WatergunAnimation,
     },
 
     {

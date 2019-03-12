@@ -74,11 +74,24 @@ void ScriptCmd_spriteblend2(void);
 void ScriptCmd_spritebufferposition(void);
 void ScriptCmd_playmessage(void);
 void ScriptCmd_spriteafterimage(void);
+void ScriptCmd_movespritedst(void);
+void ScriptCmd_setpriority(void);
+void ScriptCmd_setprioritybg(void);
+void ScriptCmd_clearblending(void);
+void ScriptCmd_spritesblendall(void);
+void ScriptCmd_fireworkeffect(void);
+void ScriptCmd_random(void);
+void ScriptCmd_fadeplatformbg(void);
+void ScriptCmd_depthlessorbit(void);
+void ScriptCmd_shrinkingorbit(void);
+void ScriptCmd_spritesetposition(void);
+void ScriptCmd_spritecallbackargs(void);
 
 
 extern const struct Frame (**nullframe)[];
 extern const struct RotscaleFrame (**nullrsf)[];
 extern void TaskMoveSprite(u8 taskId);
+extern void SCBMoveSpriteErrorCorrection(struct Sprite* spr);
 extern void TaskWaitFrames(u8 taskId);
 extern void TaskWaitFade(u8 taskId);
 extern void TaskFlashSprite(u8 taskId);
@@ -90,11 +103,14 @@ extern void TaskWaitAnimation(u8 taskId);
 extern void TaskWaitAffineAnimation(u8 taskId);
 extern void TaskMoveBG(u8 taskId);
 extern void TaskWaitAnimMessage(u8 taskId);
+extern void TaskCreateSmallFireworkGeneric(u8 taskId);
 extern void battle_loop(void);
 extern void InitAnimLinearTranslation(struct Sprite *sprite);
 extern void pick_battle_message(u16 moveId, u8 user_bank, enum BattleTypes battle_type, enum battle_string_ids id, u16 move_effect_id);
 extern void ShowBattleMessage2(pchar* str, u8 rboxid);
-
+extern void AnimOrbitFastStep(struct Sprite *sprite);
+extern void AnimOrbitFastStepNoPriority(struct Sprite *sprite);
+extern void AnimOrbitShrinkNoPriority(struct Sprite *sprite);
 
 const AnimScriptFunc gAnimTable[] = {
     ScriptCmd_loadspritefull, // 0
@@ -165,6 +181,18 @@ const AnimScriptFunc gAnimTable[] = {
     ScriptCmd_spritebufferposition, // 65
     ScriptCmd_playmessage, // 66
     ScriptCmd_spriteafterimage, // 67
+    ScriptCmd_movespritedst, // 68
+    ScriptCmd_setpriority, // 69
+    ScriptCmd_setprioritybg, // 70
+    ScriptCmd_clearblending, // 71
+    ScriptCmd_spritesblendall, // 72
+    ScriptCmd_fireworkeffect, // 73
+    ScriptCmd_random, // 74
+    ScriptCmd_fadeplatformbg, // 75
+    ScriptCmd_depthlessorbit, // 76
+    ScriptCmd_shrinkingorbit, // 77
+    ScriptCmd_spritesetposition, // 78
+    ScriptCmd_spritecallbackargs, // 79
 };
 
 
@@ -220,7 +248,7 @@ void ScriptCmd_loadspritefull()
     struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, nullrsf, (SpriteCallback)oac_nullsub};
     LoadCompressedSpriteSheetUsingHeap(gfx);
     LoadCompressedSpritePaletteUsingHeap(pal);
-    u8 spriteId = template_instanciate_forward_search(&spriteTemp, 0, 0, 0);
+    u8 spriteId = CreateSprite(&spriteTemp, 0, 0, 0);
     gSprites[spriteId].final_oam.affine_mode = false;
     gSprites[spriteId].invisible = true;
     VarSet(0x900D, spriteId);
@@ -236,7 +264,7 @@ void ScriptCmd_loadsprite()
     struct SpritePalette* pal = (struct SpritePalette*)ANIMSCR_READ_WORD;
     struct OamData* oam = (struct OamData*)ANIMSCR_READ_WORD;
     struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, nullrsf, (SpriteCallback)oac_nullsub};
-    u8 spriteId = template_instanciate_forward_search(&spriteTemp, 0, 0, 0);
+    u8 spriteId = CreateSprite(&spriteTemp, 0, 0, 0);
     gSprites[spriteId].invisible = true;
     VarSet(0x900D, spriteId);
     ANIMSCR_CMD_NEXT;
@@ -382,7 +410,9 @@ void ScriptCmd_movesprite()
     u16 spriteId = ANIMSCR_READ_HWORD;
     t->priv[0] = VarGet(spriteId);
     t->priv[1] = ANIMSCR_READ_HWORD; // Delta X
+    t->priv[1] = VarGet(t->priv[1]);
     t->priv[2] = ANIMSCR_READ_HWORD; // Delta Y
+    t->priv[2] = VarGet(t->priv[2]);
     t->priv[3] = ANIMSCR_READ_HWORD; // Amount of frames to do animation for
     t->priv[4] = ANIMSCR_READ_BYTE; // anim wait
     t->priv[5] = ANIMSCR_THREAD; // execution thread
@@ -609,12 +639,13 @@ void ScriptCmd_spritebgclear()
     ANIMSCR_MOVE(1);
     u16 spriteId = ANIMSCR_READ_HWORD;
     spriteId = VarGet(spriteId);
+    gSprites[spriteId].invisible = false;
+    HideBg(1);
     void* charBase = (void *)0x6008000;
     u16* mapBase = (void*)0x600F000;
     u32 set = 0;
     CpuFastSet((void*)&set, (void*)charBase, CPUModeFS(4096, CPUFSSET));
     CpuFastSet((void*)&set, (void*)mapBase, CPUModeFS(2048, CPUFSSET));
-    gSprites[spriteId].invisible = false;
     ANIMSCR_CMD_NEXT;
 }
 
@@ -650,11 +681,13 @@ void ScriptCmd_spritesblend()
 {
     // alignment for read
     ANIMSCR_MOVE(1);
-    u8 coefficientA = ANIMSCR_READ_BYTE;
-    u8 coefficientB = ANIMSCR_READ_BYTE;
-    REG_BLDCNT = (BLDCNT_BG1_SRC | BLDCNT_SPRITES_DST | BLDCNT_ALPHA_BLEND);
+    u16 coefficientA = ANIMSCR_READ_HWORD;
+    coefficientA = VarGet(coefficientA);
+    u16 coefficientB = ANIMSCR_READ_HWORD;
+    coefficientB = VarGet(coefficientB);
+    REG_BLDCNT = (BLDCNT_SPRITES_DST | BLDCNT_BG1_SRC | BLDCNT_ALPHA_BLEND);
     REG_BLDALPHA = BLDALPHA_BUILD(coefficientA, coefficientB);
-
+    ANIMSCR_MOVE(2);
     // set blending move for the sprite
     ANIMSCR_CMD_NEXT;
 }
@@ -786,13 +819,19 @@ void ScriptCmd_palfade()
 #define yDelta sprite->data[2]
 #define X sprite->data[4]
 #define amplitude sprite->data[5]
-#define waveOrBounce sprite->data[6]
+#define deltaError sprite->data[6]
 #define frequency sprite->data[7]
 void SCBWaveMovement(struct Sprite* sprite)
 {
-    sprite->pos1.x += Div(xDelta, 256);
-    sprite->pos1.y += Div(yDelta, 256);
+    sprite->pos1.x +=xDelta;
+    sprite->pos1.y += yDelta;
     bouncesPast += 1;
+    u8 xerror = deltaError >> 8;
+    u8 yerror = deltaError & 0xFF;
+    if (bouncesPast % xerror == 0)
+        sprite->pos1.x += xDelta > 0 ? 1 : -1;
+    if (bouncesPast % yerror == 0)
+        sprite->pos1.y += yDelta > 0 ? 1 : -1;
     if (bouncesPast > bounces)
         sprite->callback = oac_nullsub;
     // apply sin curve to Y position
@@ -801,13 +840,13 @@ void SCBWaveMovement(struct Sprite* sprite)
     else
         sprite->pos1.y += Sin(X, amplitude);
     // update wave frequency
-    X = (X + frequency) & waveOrBounce;
+    X = (X + frequency) & 0xFF;
 }
 
 void SpriteCmd_movewave()
 {
-    // alignment
-    ANIMSCR_MOVE(1);
+    // steps needed to reach DST
+    u8 steps = ANIMSCR_READ_BYTE;
     // get sprites
     u16 spriteId = ANIMSCR_READ_HWORD;
     spriteId = VarGet(spriteId);
@@ -815,21 +854,21 @@ void SpriteCmd_movewave()
     destSpriteId = VarGet(destSpriteId);
     struct Sprite* sprite = &gSprites[spriteId];
     struct Sprite* s2 = &gSprites[destSpriteId];
-    // set bounce properties
     X = 0; // starts sin(x) on X = 0. Can phase shift forward, not backwards
-    bounces = 30;
-    amplitude = ANIMSCR_READ_BYTE;
-    bouncesPast = 0;
+    bounces = steps;
+    amplitude = (s8)ANIMSCR_READ_BYTE;
     frequency = ANIMSCR_READ_BYTE;
-    waveOrBounce = ANIMSCR_READ_BYTE;
+    frequency = (256 / steps) * frequency;
     // calculate delta distances per bounce
     s32 x = s2->pos1.x - sprite->pos1.x;
     s32 y = s2->pos1.y - sprite->pos1.y;
-    xDelta = Div((x * 256), bounces);
-    yDelta = Div((y * 256), bounces);
+    xDelta = Div(x, bounces);
+    yDelta = Div(y, bounces);
+    u16 xerr = ABS((bounces / (x - (xDelta * bounces)))); // error minimization increment intervals
+    u16 yerr = ABS((bounces / (y - (yDelta * bounces)))); // error minimization increment intervals
+    deltaError = ((xerr << 8) | (yerr & 0xFF));
     // Animate sprite bounce given parameters
     sprite->callback = SCBWaveMovement;
-    ANIMSCR_MOVE(3);
     ANIMSCR_CMD_NEXT;
 }
 
@@ -1123,9 +1162,9 @@ void ScriptCmd_runtask()
     TaskCallback t = (TaskCallback)ANIMSCR_READ_WORD;
     u8 taskId = CreateTask(t, 0);
     tasks[taskId].priv[1] = VarGet(vararg);
-    tasks[taskId].priv[2] = arg;
-    tasks[taskId].priv[3] = arg2;
-    tasks[taskId].priv[4] = arg3;
+    tasks[taskId].priv[2] = VarGet(arg);
+    tasks[taskId].priv[3] = VarGet(arg2);
+    tasks[taskId].priv[4] = VarGet(arg3);
     ANIMSCR_CMD_NEXT;
 }
 
@@ -1157,6 +1196,7 @@ void ScriptCmd_setframessprite()
 
 /* Set up a sprite's private variables for horizontal arc movement */
 // Meant to be called in conjunction with TaskTranslateSpriteHorizontalArc
+// used with the pokeball. For general use, use the one below this function
 void ScriptCmd_confighorizontalarctranslate()
 {
     u8 speed = ANIMSCR_READ_BYTE;
@@ -1164,6 +1204,7 @@ void ScriptCmd_confighorizontalarctranslate()
     s16 endAngle = ANIMSCR_READ_HWORD;
     u16 spriteId = ANIMSCR_READ_HWORD;
     u16 spriteIdDst = ANIMSCR_READ_HWORD;
+    u8 mode = ANIMSCR_READ_BYTE;
     // get sprites
     spriteId = VarGet(spriteId);
     struct Sprite* sprite = &gSprites[spriteId];
@@ -1171,24 +1212,32 @@ void ScriptCmd_confighorizontalarctranslate()
     struct Sprite* spriteDst = &gSprites[spriteIdDst];
     // get total distances for x and y
     s32 x = (spriteDst->pos1.x - sprite->pos1.x);
-    s32 y = -((spriteDst->pos1.y - sprite->pos1.y) + sprite->pos1.y + 20); // peak is 20px over
+    s32 y;
+    switch (mode) {
+        case 0:
+            y = -((spriteDst->pos1.y - sprite->pos1.y) + sprite->pos1.y + 40); // peak is 40px over
+            break;
+        case 1:
+            y = -((spriteDst->pos1.y - sprite->pos1.y) + sprite->pos1.y); // normal player side
+            break;
+        default:
+            y = -sprite->pos1.y; // normal opponent's side
+            break;
+    };
     sprite->data[0] = speed; // intervals to travel distance
     sprite->data[1] = endAngle;
     sprite->data[2] = Div((x * 256), speed);
-    sprite->data[4] = speed / (x - ((sprite->data[2] / 256) * speed)); // error minimization increment intervals
     sprite->data[3] = sprite->pos1.y;
-
-    // u32 percent = (Sin2(endAngle) * 100) / Sin2(90);
+    sprite->data[4] = speed / (x - ((sprite->data[2] / 256) * speed)); // error minimization increment intervals
     sprite->data[5] = y;
     // calc frequency required
     sprite->data[6] = ABS(endAngle - startAngle) /  speed; // frequency step
     sprite->data[7] = startAngle; // frequency start
-    ANIMSCR_MOVE(2);
+    ANIMSCR_MOVE(1);
     ANIMSCR_CMD_NEXT;
 }
 
 // Make spriteA orbit spriteB with given customizations
-static void AnimOrbitFastStep(struct Sprite *sprite);
 void ScriptCmd_orbit()
 {
     bool wait = ANIMSCR_READ_BYTE;
@@ -1230,28 +1279,6 @@ void ScriptCmd_orbit()
     ANIMSCR_CMD_NEXT;
 }
 
-static void AnimOrbitFastStep(struct Sprite *sprite)
-{
-    if ((u16)(sprite->data[1] - 64) < 128)
-        sprite->final_oam.priority = MAX(0, sprite->data[7] + 1);
-    else
-        sprite->final_oam.priority = MIN(3, sprite->data[7] - 1);
-
-    sprite->pos2.x = Sin(sprite->data[1], sprite->data[2]);
-    sprite->pos2.y = Cos(sprite->data[1], sprite->data[3]);
-    sprite->data[1] = (sprite->data[1] + sprite->data[4]) & 0xFF;
-    sprite->data[0]--;
-    if (sprite->data[0] == 0) {
-        if (sprite->data[6]) {
-            gAnimationCore->wait[sprite->data[6] - 1] = false;
-        }
-        if (sprite->data[5]) {
-            FreeSpriteOamMatrix(sprite);
-            obj_free(sprite);
-        }
-        sprite->callback = (oac_nullsub);
-    }
-}
 
 // wait for frame animation of sprite to finish
 void ScriptCmd_waitanimation()
@@ -1288,6 +1315,7 @@ void ScriptCmd_spritecallback()
     ANIMSCR_MOVE(1);
     u16 spriteId = ANIMSCR_READ_HWORD;
     spriteId = VarGet(spriteId);
+    ClearSpriteData(&gSprites[spriteId]);
     gSprites[spriteId].callback = (SpriteCallback)ANIMSCR_READ_WORD;
     ANIMSCR_CMD_NEXT;
 }
@@ -1389,6 +1417,287 @@ void ScriptCmd_playmessage()
     // to wait for the cmd to finish, you must use waittask on TaskWaitAnimMessage
     ANIMSCR_CMD_NEXT;
 }
+
+// move sprite to another sprite linearly
+void ScriptCmd_movespritedst()
+{
+    u8 steps = ANIMSCR_READ_BYTE;
+    u16 spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* sprite = &gSprites[spriteId];
+    u16 spriteId2 = ANIMSCR_READ_HWORD;
+    spriteId2 = VarGet(spriteId2);
+    struct Sprite* s2 = &gSprites[spriteId2];
+
+    // calculate delta distances per movement
+    s32 x = s2->pos1.x - sprite->pos1.x;
+    s32 y = s2->pos1.y - sprite->pos1.y;
+    s16 xDelta = Div(x, steps);
+    s16 yDelta = Div(y, steps);
+
+    sprite->callback = SCBMoveSpriteErrorCorrection;
+    sprite->data[0] = steps;
+    sprite->data[1] = xDelta;
+    sprite->data[2] = yDelta;
+    sprite->data[3] = steps / (x - (xDelta * steps)); // error minimization increment intervals
+    sprite->data[4] = steps / (y - (yDelta * steps)); // error minimization increment intervals
+
+    // to wait for finish, make sure to put use a waitanim command as the next command.
+    ANIMSCR_MOVE(2);
+    ANIMSCR_CMD_NEXT;
+}
+
+// blend sprites, on all layers including BG 3
+/* Given a coefficient for the amount of blending for the sprites and BG 0. Apply blending */
+void ScriptCmd_spritesblendall()
+{
+    // alignment for read
+    ANIMSCR_MOVE(1);
+    u16 coefficientA = ANIMSCR_READ_HWORD;
+    coefficientA = VarGet(coefficientA);
+    u16 coefficientB = ANIMSCR_READ_HWORD;
+    coefficientB = VarGet(coefficientB);
+    REG_BLDCNT = (BLDCNT_BG1_SRC | BLDCNT_BG3_SRC | BLDCNT_SPRITES_DST | BLDCNT_ALPHA_BLEND);
+    REG_BLDALPHA = BLDALPHA_BUILD(coefficientA, coefficientB);
+    ANIMSCR_MOVE(2);
+    ANIMSCR_CMD_NEXT;
+}
+
+// sets the priority of a sprite
+void ScriptCmd_setpriority()
+{
+    // alignment for read
+    u8 priority = ANIMSCR_READ_BYTE;
+    u16 spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    gSprites[spriteId].final_oam.priority = priority;
+    ANIMSCR_CMD_NEXT;
+}
+
+// sets the priority of a BG
+void ScriptCmd_setprioritybg()
+{
+    // alignment for read
+    u8 priority = ANIMSCR_READ_BYTE;
+    u8 bgid = ANIMSCR_READ_BYTE;
+    switch (bgid) {
+        case 1:
+            REG_BG1CNT &= ~3;
+            REG_BG1CNT |= priority;
+            break;
+        case 2:
+            REG_BG2CNT &= ~3;
+            REG_BG2CNT |= priority;
+            break;
+        case 3:
+            REG_BG3CNT &= ~3;
+            REG_BG3CNT |= priority;
+            break;
+    }
+    ANIMSCR_MOVE(1);
+    ANIMSCR_CMD_NEXT;
+}
+
+// Clears REGBLD
+void ScriptCmd_clearblending()
+{
+    // alignment for read
+    ANIMSCR_MOVE(3);
+    REG_BLDCNT = 0;
+    ANIMSCR_CMD_NEXT;
+}
+
+// Run the firework effect with a generic sprite
+void ScriptCmd_fireworkeffect()
+{
+    ANIMSCR_MOVE(2);
+    u8 argbits = ANIMSCR_READ_BYTE;
+    u32 pgfx = ANIMSCR_READ_WORD;
+    u32 ppal = ANIMSCR_READ_WORD;
+    u32 poam = ANIMSCR_READ_WORD;
+    u32 affine = ANIMSCR_READ_WORD;
+    s16 currentx = ANIMSCR_READ_HWORD;
+    s16 currenty = ANIMSCR_READ_HWORD;
+
+    u8 blend = argbits & 1;
+    u8 left = argbits & 1;
+    currentx = VarGet(currentx);
+    currentx += left ? rand_range(0, 10) - 10 : rand_range(0, 10);
+    currenty = VarGet(currenty);
+    currenty += rand_range(0, 20) - 10;
+    struct CompressedSpriteSheet* gfx = (struct CompressedSpriteSheet*)pgfx;
+    struct SpritePalette* pal = (struct SpritePalette*)ppal;
+    struct OamData* oam = (struct OamData*)poam;
+    struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, (void*)affine, (SpriteCallback)oac_nullsub};
+    u8 spriteId = CreateSprite(&spriteTemp, currentx, currenty, 0);
+    struct RotscaleFrame (**rotscale_table)[] = (void*)affine;
+    gSprites[spriteId].rotscale_table = rotscale_table;
+    gSprites[spriteId].final_oam.affine_mode = 1;
+    gSprites[spriteId].final_oam.priority = 3;
+    if (!blend) {
+        gSprites[spriteId].final_oam.obj_mode = 1;
+        gSprites[spriteId].final_oam.priority = 1;
+    }
+    struct Task* t = &tasks[CreateTask(TaskCreateSmallFireworkGeneric, 0)];
+    t->priv[1] = spriteId;
+    t->priv[3] = currentx;
+    t->priv[4] = currenty;
+    // acceleration. Y must be always negative
+    t->priv[8] = 1;
+    t->priv[9] = 2;
+    // initial velocities
+    t->priv[5] = left ? -rand_range(1, 3) : rand_range(1, 3);
+    t->priv[6] = -(rand_range(1, 4));
+    ANIMSCR_CMD_NEXT;
+}
+
+// puts a random number between two given numbers in var 0x900D, lastresult
+void ScriptCmd_random()
+{
+    // alignment for read
+    ANIMSCR_MOVE(3);
+    u16 min = ANIMSCR_READ_HWORD;
+    u16 max = ANIMSCR_READ_HWORD;
+    VarSet(0x900D, rand_range(min, max));
+    ANIMSCR_CMD_NEXT;
+}
+
+/* Blend platform bg. This will work if other sprites aren't in the process of blending */
+void ScriptCmd_fadeplatformbg()
+{
+    ANIMSCR_MOVE(3);
+    ANIMSCR_PALBUFF |= (1 << 0);
+    ANIMSCR_CMD_NEXT;
+}
+
+
+// Make spriteA orbit spriteB with given customizations
+void ScriptCmd_depthlessorbit()
+{
+    bool wait = ANIMSCR_READ_BYTE;
+    // spriteA
+    u16 spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* sprite = &gSprites[spriteId];
+    // spriteB
+    spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* toOrbit = &gSprites[spriteId];
+
+    toOrbit->final_oam.priority = 2;
+    sprite->data[0] = ANIMSCR_READ_HWORD; // duration
+    sprite->data[0] = MAX(1, sprite->data[0]);
+    sprite->data[2] = ANIMSCR_READ_BYTE; // width
+    sprite->data[3] = ANIMSCR_READ_BYTE; // height
+    u8 direction = ANIMSCR_READ_BYTE; // direction
+    if (direction) {
+        // left
+        sprite->data[2] = -sprite->data[2];
+        sprite->data[3] = -sprite->data[3];
+    }
+    sprite->data[4] = ANIMSCR_READ_BYTE; // speed
+    // animation should pause script thread or not
+    if (wait) {
+        sprite->data[6] = ANIMSCR_THREAD;
+        sprite->data[6] += 1;
+        ANIMSCR_WAITING = true;
+    } else {
+        sprite->data[6] = 0;
+    }
+    sprite->data[5] = ANIMSCR_READ_BYTE; // bool to delete
+    sprite->data[1] = ANIMSCR_READ_BYTE; // wave offset (0 - 255)
+    sprite->data[7] = toOrbit->final_oam.priority;
+    sprite->callback = AnimOrbitFastStepNoPriority;
+    sprite->callback(sprite);
+    ANIMSCR_MOVE(2);
+    ANIMSCR_CMD_NEXT;
+}
+
+// Make spriteA orbit spriteB with given customizations
+void ScriptCmd_shrinkingorbit()
+{
+    bool wait = ANIMSCR_READ_BYTE;
+    // spriteA
+    u16 spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* sprite = &gSprites[spriteId];
+    // spriteB
+    spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* toOrbit = &gSprites[spriteId];
+
+    toOrbit->final_oam.priority = 2;
+    sprite->data[0] = ANIMSCR_READ_HWORD; // duration
+    sprite->data[0] = MAX(1, sprite->data[0]);
+    sprite->data[2] = ANIMSCR_READ_BYTE; // width
+    sprite->data[3] = ANIMSCR_READ_BYTE; // height
+    u8 direction = ANIMSCR_READ_BYTE; // direction
+    if (direction) {
+        // left
+        sprite->data[2] = -sprite->data[2];
+        sprite->data[3] = -sprite->data[3];
+    }
+    sprite->data[4] = ANIMSCR_READ_BYTE; // speed
+    // animation should pause script thread or not
+    if (wait) {
+        sprite->data[6] = ANIMSCR_THREAD;
+        sprite->data[6] += 1;
+        ANIMSCR_WAITING = true;
+    } else {
+        sprite->data[6] = 0;
+    }
+    sprite->data[5] = ANIMSCR_READ_BYTE; // bool to delete
+    sprite->data[1] = ANIMSCR_READ_HWORD; // wave offset (0 - 255)
+    sprite->data[1] = VarGet(sprite->data[1]);
+    sprite->data[7] = toOrbit->final_oam.priority;
+    sprite->callback = AnimOrbitShrinkNoPriority;
+    sprite->callback(sprite);
+    ANIMSCR_MOVE(1);
+    ANIMSCR_CMD_NEXT;
+}
+
+// set a sprite's position to the given position
+void ScriptCmd_spritesetposition()
+{
+    ANIMSCR_MOVE(1);
+    // sprite
+    u16 spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* sprite = &gSprites[spriteId];
+    // positions
+    s16 posx = ANIMSCR_READ_HWORD;
+    s16 posy = ANIMSCR_READ_HWORD;
+    posx = VarGet(posx);
+    posy = VarGet(posy);
+    sprite->pos1.x = posx;
+    sprite->pos1.y = posy;
+    ANIMSCR_CMD_NEXT;
+}
+
+void ScriptCmd_spritecallbackargs()
+{
+    ANIMSCR_MOVE(1);
+    // sprite
+    u16 spriteId = ANIMSCR_READ_HWORD;
+    spriteId = VarGet(spriteId);
+    struct Sprite* sprite = &gSprites[spriteId];
+    // clear sprite args
+    ClearSpriteData(sprite);
+    // read args
+    sprite->data[0] = ANIMSCR_READ_HWORD;
+    sprite->data[0] = VarGet(sprite->data[0]);
+    sprite->data[1] = ANIMSCR_READ_HWORD;
+    sprite->data[1] = VarGet(sprite->data[1]);
+    sprite->data[2] = ANIMSCR_READ_HWORD;
+    sprite->data[2] = VarGet(sprite->data[2]);
+    sprite->data[3] = ANIMSCR_READ_HWORD;
+    sprite->data[3] = VarGet(sprite->data[3]);
+    // read and assign callback
+    sprite->callback = (void*)ANIMSCR_READ_WORD;
+    ANIMSCR_CMD_NEXT;
+}
+
+
 
 void AnimationMain()
 {

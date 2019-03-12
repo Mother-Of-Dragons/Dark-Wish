@@ -284,12 +284,20 @@ extern u8 block_on_effect(u8 user, u8 src, u16 move, struct anonymous_callback* 
 extern u8 fairy_lock_on_effect(u8 user, u8 src, u16 move, struct anonymous_callback* acb);
 
 /* Move Animation scripts */
+extern const u8* KaratechopAnimation;
+extern const u8* DoubleSlapAnimation;
+extern const u8* CometpunchAnimation;
+extern const u8* MegapunchAnimation;
+extern const u8* FirepunchAnimation;
+extern const u8* IcepunchAnimation;
+extern const u8* ThunderpunchAnimation;
+extern const u8* VicegripAnimation;
 extern const u8* TackleAnimation;
 extern const u8* TakedownAnimation;
 extern const u8* FireworkAnimation;
 extern const u8* SlamAnimation;
 extern const u8* ShadowpunchAnimation;
-
+extern const u8* WatergunAnimation;
 
 /* User stats */
 extern struct move_procs user_lower_atk_1;

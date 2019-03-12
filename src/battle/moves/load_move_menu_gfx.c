@@ -101,7 +101,7 @@ u8 load_dmg_type_icon(u8 type, s16 x, s16 y, u8 tag)
                                 (SpriteCallback)oac_nullsub};
     gpu_tile_obj_alloc_tag_and_upload(&icon_gfx);
     gpu_pal_obj_alloc_tag_and_apply(&icon_pal);
-    return template_instanciate_forward_search(&icon_temp, x, y, 0);
+    return CreateSprite(&icon_temp, x, y, 0);
 }
 
 u8 load_dmg_category_icon(u8 category, s16 x, s16 y, u8 tag)
@@ -112,7 +112,7 @@ u8 load_dmg_category_icon(u8 category, s16 x, s16 y, u8 tag)
                                 (SpriteCallback)oac_nullsub};
     gpu_tile_obj_alloc_tag_and_upload(&icon_gfx);
     gpu_pal_obj_alloc_tag_and_apply(&icon_pal);
-    return template_instanciate_forward_search(&icon_temp, x, y, 0);
+    return CreateSprite(&icon_temp, x, y, 0);
 }
 
 u8 load_small_dmg_category_icon(u8 category, s16 x, s16 y, u8 tag)
@@ -123,19 +123,20 @@ u8 load_small_dmg_category_icon(u8 category, s16 x, s16 y, u8 tag)
                                 (SpriteCallback)oac_nullsub};
     gpu_tile_obj_alloc_tag_and_upload(&icon_gfx);
     gpu_pal_obj_alloc_tag_and_apply(&icon_pal);
-    return template_instanciate_forward_search(&icon_temp, x, y, 0);
+    return CreateSprite(&icon_temp, x, y, 0);
 }
 
 const struct TextboxTemplate tempObjText = {
     .width = 8,
     .height = 2,
 };
+
 void draw_text_obj(u8 font, u8 x_shift, u8 y_shift, pchar* string_buff, void* vram_addr, u8 background_pal)
 {
     u8 r_id = rboxid_init((struct TextboxTemplate*)&tempObjText);
     rboxid_clear_pixels(r_id, background_pal);
-    u32 arrays[] = {2, 1, 3};
-    rboxid_add_812E5A4(r_id, font, x_shift, y_shift, 0, 0, (u32*)&arrays[0], 0xFF, string_buff);
+    struct TextColor color = {2, 1, 3};
+    rboxid_add_812E5A4(r_id, font, x_shift, y_shift, 0, 0, &color, 0xFF, string_buff);
     u32 pixels = rboxid_get_field(r_id, 7);
     rbox_to_vram(vram_addr, (void*)(pixels), 8);
     rboxid_free(r_id);
@@ -167,19 +168,19 @@ u8 draw_pp(u8 bank, u8 index)
 
      switch (index) {
         case 0:
-            objid = template_instanciate_forward_search(&text_temp, 110, 131, 0);
+            objid = CreateSprite(&text_temp, 110, 131, 0);
             vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
             break;
         case 1:
-            objid = template_instanciate_forward_search(&text_temp, 212, 131, 0);
+            objid = CreateSprite(&text_temp, 212, 131, 0);
             vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
             break;
         case 2:
-            objid = template_instanciate_forward_search(&text_temp, 110, 150, 0);
+            objid = CreateSprite(&text_temp, 110, 150, 0);
             vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
             break;
         default:
-            objid = template_instanciate_forward_search(&text_temp, 212, 150, 0);
+            objid = CreateSprite(&text_temp, 212, 150, 0);
             vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
             break;
     };
@@ -211,19 +212,19 @@ void load_names_moves(u8 bank)
         u8 objid;
         switch (i) {
             case 0:
-                objid = template_instanciate_forward_search(&text_temp, 43, 131, 0);
+                objid = CreateSprite(&text_temp, 43, 131, 0);
                 vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
                 break;
             case 1:
-                objid = template_instanciate_forward_search(&text_temp, 145, 131, 0);
+                objid = CreateSprite(&text_temp, 145, 131, 0);
                 vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
                 break;
             case 2:
-                objid = template_instanciate_forward_search(&text_temp, 43, 150, 0);
+                objid = CreateSprite(&text_temp, 43, 150, 0);
                 vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
                 break;
             default:
-                objid = template_instanciate_forward_search(&text_temp, 145, 150, 0);
+                objid = CreateSprite(&text_temp, 145, 150, 0);
                 vram_addr = (void*)((gSprites[objid].final_oam.tile_num * 32) + 0x6010000);
                 break;
         };

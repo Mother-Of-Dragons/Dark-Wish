@@ -18,7 +18,7 @@
 
 @ -----------------------------------------------
 
-@Loads the sprite Id into var_800D
+@Loads the sprite Id into 0x900D
 .macro loadspritefull graphics palette oam
 .byte 0
 .byte 0
@@ -183,8 +183,10 @@
 .macro spriteblend coa cob
 .byte 20
 .byte 0
-.byte \coa
-.byte \cob
+.hword \coa
+.hword \cob
+.byte 0
+.byte 0
 .endm
 
 .macro excludeblend var
@@ -260,23 +262,13 @@
 .byte 0
 .endm
 
-
-@ -----------------------------------------------
-@ Defines for the sin wave effect
-.equ BOUNCE, 0xF
-.equ SINWAVE, 0xFF
-@ -----------------------------------------------
-.macro movewave spritea spriteb amplitude frequency wavetype
+.macro movewave spritea spriteb amplitude waves steps
 .byte 27
-.byte 0
+.byte \steps
 .hword \spritea
 .hword \spriteb
 .byte \amplitude
-.byte \frequency
-.byte \wavetype
-.byte 0
-.byte 0
-.byte 0
+.byte \waves
 .endm
 
 .macro loadbg2 palsize tileset tilemap palette
@@ -427,7 +419,7 @@
 .hword \var
 .endm
 
-.macro random min max
+.macro grandom min max
 .byte 46
 .byte 0
 .hword \min
@@ -506,15 +498,21 @@
 .word \task
 .endm
 
+@ -----------------------------------------------
+@ Defines for pal fading
+.equ POKEBALL, 0
+.equ PLAYERSIDE, 1
+.equ OPPONENTSIDE, 2
+@ -----------------------------------------------
 @speed is the amount of frames to travel the distance
-.macro horizontalArcTranslate startAngle endAngle varSrc varDst speed
+.macro horizontalArcTranslate startAngle endAngle varSrc varDst speed mode
 .byte 55
 .byte \speed
 .hword \startAngle
 .hword \endAngle
 .hword \varSrc
 .hword \varDst
-.byte 0
+.byte \mode
 .byte 0
 .endm
 
@@ -625,6 +623,123 @@
 .hword \var
 .hword \tilesw
 .hword \tilesh
+.endm
+
+.macro spritemovedst steps vara varb
+.byte 68
+.byte \steps
+.hword \vara
+.hword \varb
+.byte 0
+.byte 0
+.endm
+
+.macro spritepriority var priority
+.byte 69
+.byte \priority
+.hword \var
+.endm
+
+.macro setprioritybg bg priority
+.byte 70
+.byte \priority
+.byte \bg
+.byte 0
+.endm
+
+.macro clearblending
+.byte 71
+.byte 0
+.byte 0
+.byte 0
+.endm
+
+.macro spritesblendall coa cob
+.byte 72
+.byte 0
+.hword \coa
+.hword \cob
+.byte 0
+.byte 0
+.endm
+
+.macro applyfirework gfx pal oam affine argbits originx originy
+.byte 73
+.byte 0
+.byte 0
+.byte \argbits
+.word \gfx
+.word \pal
+.word \oam
+.word \affine
+.hword \originx
+.hword \originy
+.endm
+
+.macro random min max
+.byte 74
+.byte 0
+.byte 0
+.byte 0
+.hword \min
+.hword \max
+.endm
+
+.macro addfadeplatformbg
+.byte 75
+.byte 0
+.byte 0
+.byte 0
+.endm
+
+.macro depthlessorbit spriteA spriteB duration width height dir speed boolwait booldelete waveoffset
+.byte 76
+.byte \boolwait
+.hword \spriteA
+.hword \spriteB
+.hword \duration
+.byte \width
+.byte \height
+.byte \dir
+.byte \speed
+.byte \booldelete
+.byte \waveoffset
+.byte 0
+.byte 0
+.endm
+
+.macro shrinkingorbit spriteA spriteB duration width height dir speed boolwait booldelete waveoffset
+.byte 77
+.byte \boolwait
+.hword \spriteA
+.hword \spriteB
+.hword \duration
+.byte \width
+.byte \height
+.byte \dir
+.byte \speed
+.byte \booldelete
+.hword \waveoffset
+.byte 0
+.endm
+
+.macro spritesetposition var varx vary
+.byte 78
+.byte 0
+.hword \var
+.hword \varx
+.hword \vary
+.endm
+
+.macro spritecallbackargs spr var1 var2 var3 var4 callback
+.byte 79
+.byte 0
+.hword \spr
+.hword \var1
+.hword \var2
+.hword \var3
+.hword \var4
+.word \callback
 .endm
 
 .macro BLOCKCMD

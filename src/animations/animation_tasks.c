@@ -7,7 +7,8 @@
 
 #define gtargetx 0x8000
 #define gtargety 0x8001
-
+extern const struct Frame (**nullframe)[];
+extern const struct RotscaleFrame (**nullrsf)[];
 
 
 void TaskWaitAnimMessage(u8 taskId)
@@ -24,6 +25,10 @@ void TaskWaitAnimMessage(u8 taskId)
 #define thread t->priv[5]
 #define framesPast t->priv[6]
 #define direction t->priv[7]
+#define xerror t->priv[8]
+#define totalFramesPast t->priv[9]
+#define yerror t->priv[10]
+
 void TaskMoveSprite(u8 taskId)
 {
     struct Task* t = &tasks[taskId];
@@ -62,7 +67,9 @@ void TaskMoveBG(u8 taskId)
 #undef animwait
 #undef thread
 #undef framesPast
-
+#undef xerror
+#undef yerror
+#undef totalFramesPast
 
 
 // wait X frames before deleting task and undoing wait state
@@ -270,7 +277,7 @@ void TaskQuakeSprite(u8 taskId)
         dirY = !dirUp;
         quakeCount++;
     } else {
-        gSprites[spriteId].pos1.y -= yquake;
+        gSprites[spriteId].pos1.y += yquake;
         dirY = dirUp;
         quakeCount++;
     }
@@ -513,13 +520,47 @@ void TaskMoveSinLeftAndRight(u8 taskId)
 #define state t->priv[10]
 #define delay t->priv[11]
 #define delaytimer t->priv[12]
+#define gfxpriv t->priv[13]
+#define palpriv t->priv[14]
+#define oampriv t->priv[15]
 extern const struct CompressedSpriteSheet glowballSprite;
 extern const struct SpritePalette glowballPalette;
 extern const struct OamData glowballOam;
-extern const struct RotscaleFrame glowballAffineTable[];
-extern const u32 glowballAffinePtr;
-extern const struct Frame (**nullframe)[];
-extern const struct RotscaleFrame (**nullrsf)[];
+extern const u32 glowballSmallerAffine;
+extern const u32 glowballAffine;
+extern const u32 glowballRevAffine;
+
+
+void TaskCreateSmallFireworkGeneric(u8 taskId)
+{
+    struct Task* t = &tasks[taskId];
+
+    switch (state) {
+        case 0:
+            // if affine transformation done end
+            if (gSprites[spriteId].affineAnimEnded) {
+                state++;
+                return;
+            }
+            // update vectors
+            vX += (accX / 32);
+            vY += (accY / 32);
+            currentx += vX;
+            currenty += vY;
+            gSprites[spriteId].pos1.x = currentx;
+            gSprites[spriteId].pos1.y = currenty;
+            accX += 1;
+            accY = MAX(accY + 2, 10);
+            break;
+        case 1:
+            // delete sprite
+            FreeSpriteOamMatrix(&gSprites[spriteId]);
+            DestroySprite(&gSprites[spriteId]);
+            DestroyTask(taskId);
+            break;
+    };
+}
+
 void TaskCreateSmallFireworkImpact(u8 taskId)
 {
     struct Task* t = &tasks[taskId];
@@ -540,10 +581,10 @@ void TaskCreateSmallFireworkImpact(u8 taskId)
             struct OamData* oam = (struct OamData*)&glowballOam;
             struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, nullrsf, (SpriteCallback)oac_nullsub};
             u16 color = t->priv[1];
-            spriteId = template_instanciate_forward_search(&spriteTemp, currentx, currenty, 0);
+            spriteId = CreateSprite(&spriteTemp, currentx, currenty, 0);
             u8 pal_slot = gSprites[spriteId].final_oam.palette_num;
             BlendPalette((pal_slot * 16) + (16 * 16), 16, 12, color);
-            struct RotscaleFrame (**rotscale_table)[] = (void*)&glowballAffinePtr;
+            struct RotscaleFrame (**rotscale_table)[] = (void*)&glowballAffine;
             gSprites[spriteId].rotscale_table = rotscale_table;
             gSprites[spriteId].final_oam.affine_mode = 1;
             gSprites[spriteId].final_oam.priority = 3;
@@ -576,6 +617,190 @@ void TaskCreateSmallFireworkImpact(u8 taskId)
             gSprites[spriteId].pos1.y = currenty;
             accX += 1;
             accY = MAX(accY + 2, 10);
+            break;
+        case 2:
+            // delete sprite
+            FreeSpriteOamMatrix(&gSprites[spriteId]);
+            DestroySprite(&gSprites[spriteId]);
+            DestroyTask(taskId);
+            break;
+    };
+}
+
+void TaskCreateSmallerFireworkImpact(u8 taskId)
+{
+    struct Task* t = &tasks[taskId];
+
+    switch (state) {
+        case 0:
+        {
+            u8 blend = arg1bits & 1;
+            u8 left = arg1bits & 2;
+            currentx = VarGet(currentx);
+            currentx += left ? rand_range(0, 10) - 10 : rand_range(0, 10);
+            currenty = VarGet(currenty);
+            currenty += rand_range(0, 20) - 10;
+            ystart = currenty;
+
+            struct CompressedSpriteSheet* gfx = (struct CompressedSpriteSheet*)&glowballSprite;
+            struct SpritePalette* pal = (struct SpritePalette*)&glowballPalette;
+            struct OamData* oam = (struct OamData*)&glowballOam;
+            struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, nullrsf, (SpriteCallback)oac_nullsub};
+            u16 color = t->priv[1];
+            spriteId = CreateSprite(&spriteTemp, currentx, currenty, 0);
+            u8 pal_slot = gSprites[spriteId].final_oam.palette_num;
+            BlendPalette((pal_slot * 16) + (16 * 16), 16, 12, color);
+            struct RotscaleFrame (**rotscale_table)[] = (void*)&glowballSmallerAffine;
+            gSprites[spriteId].rotscale_table = rotscale_table;
+            gSprites[spriteId].final_oam.affine_mode = 1;
+            gSprites[spriteId].final_oam.priority = 3;
+            if (!blend) {
+                gSprites[spriteId].final_oam.obj_mode = 1;
+                gSprites[spriteId].final_oam.priority = 1;
+            }
+
+            // acceleration. Y must be always negative
+            accX = 1;
+            accY = 2;
+            // initial velocities
+            vX = left ? -rand_range(1, 3) : rand_range(1, 3);
+            vY = -(rand_range(1, 4));
+            state++;
+            break;
+        }
+        case 1:
+            // if affine transformation done end
+            if (gSprites[spriteId].affineAnimEnded) {
+                state++;
+                return;
+            }
+            // update vectors
+            vX += (accX / 32);
+            vY += (accY / 32);
+            currentx += vX;
+            currenty += vY;
+            gSprites[spriteId].pos1.x = currentx;
+            gSprites[spriteId].pos1.y = currenty;
+            accX += 1;
+            accY = MAX(accY + 2, 10);
+            break;
+        case 2:
+            // delete sprite
+            FreeSpriteOamMatrix(&gSprites[spriteId]);
+            DestroySprite(&gSprites[spriteId]);
+            DestroyTask(taskId);
+            break;
+    };
+}
+
+void TaskCreateSmallLinearFireworkImpact(u8 taskId)
+{
+    struct Task* t = &tasks[taskId];
+
+    switch (state) {
+        case 0:
+        {
+            u8 blend = arg1bits & 1;
+            u8 left = arg1bits & 2;
+            currentx = VarGet(currentx);
+            currentx += left ? rand_range(0, 10) - 10 : rand_range(0, 10);
+            currenty = VarGet(currenty);
+            currenty += rand_range(0, 20) - 10;
+            ystart = currenty;
+
+            struct CompressedSpriteSheet* gfx = (struct CompressedSpriteSheet*)&glowballSprite;
+            struct SpritePalette* pal = (struct SpritePalette*)&glowballPalette;
+            struct OamData* oam = (struct OamData*)&glowballOam;
+            struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, nullrsf, (SpriteCallback)oac_nullsub};
+            u16 color = t->priv[1];
+            spriteId = CreateSprite(&spriteTemp, currentx, currenty, 0);
+            u8 pal_slot = gSprites[spriteId].final_oam.palette_num;
+            BlendPalette((pal_slot * 16) + (16 * 16), 16, 12, color);
+            struct RotscaleFrame (**rotscale_table)[] = (void*)&glowballAffine;
+            gSprites[spriteId].rotscale_table = rotscale_table;
+            gSprites[spriteId].final_oam.affine_mode = 1;
+            gSprites[spriteId].final_oam.priority = 3;
+            if (!blend) {
+                gSprites[spriteId].final_oam.obj_mode = 1;
+                gSprites[spriteId].final_oam.priority = 1;
+            }
+
+            // initial velocities
+            vX = left ? -rand_range(1, 3) : rand_range(1, 3);
+            vY = rand() % 2 ? -rand_range(1, 4) : rand_range(1, 4);
+            state++;
+            break;
+        }
+        case 1:
+            // if affine transformation done end
+            if (gSprites[spriteId].affineAnimEnded) {
+                state++;
+                return;
+            }
+            // update vectors
+            currentx += vX;
+            currenty += vY;
+            gSprites[spriteId].pos1.x = currentx;
+            gSprites[spriteId].pos1.y = currenty;
+            break;
+        case 2:
+            // delete sprite
+            FreeSpriteOamMatrix(&gSprites[spriteId]);
+            DestroySprite(&gSprites[spriteId]);
+            DestroyTask(taskId);
+            break;
+    };
+}
+
+void TaskCreateSmallLinearFireworkImpactRev(u8 taskId)
+{
+    struct Task* t = &tasks[taskId];
+
+    switch (state) {
+        case 0:
+        {
+            u8 blend = arg1bits & 1;
+            u8 left = arg1bits & 2;
+            currentx = VarGet(currentx);
+            currentx += left ? rand_range(0, 10) - 10 : rand_range(0, 10);
+            currenty = VarGet(currenty);
+            currenty += rand_range(0, 20) - 10;
+            ystart = currenty;
+
+            struct CompressedSpriteSheet* gfx = (struct CompressedSpriteSheet*)&glowballSprite;
+            struct SpritePalette* pal = (struct SpritePalette*)&glowballPalette;
+            struct OamData* oam = (struct OamData*)&glowballOam;
+            struct Template spriteTemp = {gfx->tag, pal->tag, oam, nullframe, gfx, nullrsf, (SpriteCallback)oac_nullsub};
+            u16 color = t->priv[1];
+            spriteId = CreateSprite(&spriteTemp, currentx, currenty, 0);
+            u8 pal_slot = gSprites[spriteId].final_oam.palette_num;
+            BlendPalette((pal_slot * 16) + (16 * 16), 16, 12, color);
+            struct RotscaleFrame (**rotscale_table)[] = (void*)&glowballRevAffine;
+            gSprites[spriteId].rotscale_table = rotscale_table;
+            gSprites[spriteId].final_oam.affine_mode = 1;
+            gSprites[spriteId].final_oam.priority = 3;
+            if (!blend) {
+                gSprites[spriteId].final_oam.obj_mode = 1;
+                gSprites[spriteId].final_oam.priority = 1;
+            }
+
+            // initial velocities
+            vX = left ? -rand_range(1, 3) : rand_range(1, 3);
+            vY = rand() % 2 ? -rand_range(1, 4) : rand_range(1, 4);
+            state++;
+            break;
+        }
+        case 1:
+            // if affine transformation done end
+            if (gSprites[spriteId].affineAnimEnded) {
+                state++;
+                return;
+            }
+            // update vectors
+            currentx += vX;
+            currenty += vY;
+            gSprites[spriteId].pos1.x = currentx;
+            gSprites[spriteId].pos1.y = currenty;
             break;
         case 2:
             // delete sprite
@@ -631,7 +856,7 @@ void TaskTranslateSpriteHorizontalArc(u8 taskId)
 {
     struct Task* t = &tasks[taskId];
     struct Sprite* sprite = &gSprites[t->priv[1]];
-    if (!sprite->data[0]) {
+    if (!sprite->data[0] || !sprite->inUse) {
         DestroyTask(taskId);
         return;
     }
@@ -646,9 +871,32 @@ void TaskTranslateSpriteHorizontalArc(u8 taskId)
             sprite->pos1.x += 1;
         }
     }
-
     sprite->data[0]--;
 }
+
+// meant to be used in conjunction with ScriptCmd_confighorizontalarctranslate
+void TaskTranslateSpriteHorizontalArcCos(u8 taskId)
+{
+    struct Task* t = &tasks[taskId];
+    struct Sprite* sprite = &gSprites[t->priv[1]];
+    if (!sprite->data[0] || !sprite->inUse) {
+        DestroyTask(taskId);
+        return;
+    }
+    sprite->data[7] += sprite->data[6]; // frequency step
+    // amplitude must be a percentage from total amplitude * current sin(x) / sin(pi/2)
+    u32 percent = (Cos2(sprite->data[7]) * 100) / Cos2(0);
+    sprite->pos1.y = PERCENT(sprite->data[5], percent) + (sprite->data[3] * 2);
+    sprite->pos1.x += (sprite->data[2] / 256);
+    // add 1px to the X as an error correction, if conditions align
+    if (sprite->data[4] != 0) {
+        if ((sprite->data[0] % sprite->data[4]) == 0) {
+            sprite->pos1.x -= 1;
+        }
+    }
+    sprite->data[0]--;
+}
+
 #undef startX
 #undef deltaX
 #undef dstX
@@ -660,7 +908,7 @@ void TaskTranslateSpriteHorizontalArc(u8 taskId)
 extern const struct CompressedSpriteSheet pokeballParticleSprite;
 extern const struct SpritePalette pokeballParticlePalette;
 extern const struct OamData pokeballParticleOam;
-extern const struct Frame* pokeballParticleLoopPtr[];
+extern const struct Frame* pokeballParticleFrames[];
 
 #define basemovement 1
 #define spritedur 40
@@ -688,10 +936,10 @@ void TaskDrawPokeballGlitter(u8 taskId)
             // make the sprites
             struct CompressedSpriteSheet gfx = (struct CompressedSpriteSheet)pokeballParticleSprite;
             struct SpritePalette pal = (struct SpritePalette)pokeballParticlePalette;
-            struct Template spriteTemp = {gfx.tag, pal.tag, &pokeballParticleOam, (void*)pokeballParticleLoopPtr, &gfx, nullrsf, (SpriteCallback)SCBMoveSpriteLinear};
+            struct Template spriteTemp = {gfx.tag, pal.tag, &pokeballParticleOam, (void*)pokeballParticleFrames, &gfx, nullrsf, (SpriteCallback)SCBMoveSpriteLinear};
             LoadCompressedSpriteSheetUsingHeap(&gfx);
             LoadCompressedSpritePaletteUsingHeap(&pal);
-            u8 spriteId = template_instanciate_forward_search(&spriteTemp, sprite->pos1.x, sprite->pos1.y, 0);
+            u8 spriteId = CreateSprite(&spriteTemp, sprite->pos1.x, sprite->pos1.y, 0);
             switch (t->priv[10]) {
                 case 0:
                     // axis y = 0, for all positive X

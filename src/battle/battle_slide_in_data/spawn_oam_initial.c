@@ -70,7 +70,7 @@ u8 spawn_pkmn_obj_slot(u8 bank, u16 tag)
 
     LoadCompressedSpriteSheetUsingHeap(&pkmn_sprite_gfx);
     LoadCompressedSpritePaletteUsingHeap(&pkmn_sprite_pal);
-    return template_instanciate_forward_search(&pkmn_temp, OPP1_X_POS_SLIDE, 54 + gMonFrontPicCoords[species].y_offset, 0);
+    return CreateSprite(&pkmn_temp, OPP1_X_POS_SLIDE, 54 + gMonFrontPicCoords[species].y_offset, 0);
 }
 
 u8 spawn_pkmn_backsprite_obj_slot(u8 bank, u16 tag)
@@ -88,7 +88,7 @@ u8 spawn_pkmn_backsprite_obj_slot(u8 bank, u16 tag)
     LoadCompressedSpriteSheetUsingHeap(&pkmn_sprite_gfx);
     LoadCompressedSpritePaletteUsingHeap(&pkmn_sprite_pal);
     u8 species_y = gMonBackPicCoords[species].y_offset;
-    return template_instanciate_forward_search(&pkmn_temp, 64, 80 + species_y, 0);
+    return CreateSprite(&pkmn_temp, 64, 80 + species_y, 0);
 }
 
 static struct Frame trainer_slide_in[] = {
@@ -156,11 +156,11 @@ u8 spawn_backsprite_npc(u8 sprite_id, u16 tag)
 
     struct SpritePalette player_sprite_pal = {player_pal, tag};
     struct CompressedSpriteSheet player_sprite_gfx = {player_gfx, 2048 * 5, tag};
-    struct Template player_temp = {tag, tag, &opp_oam, trainer_frame_table, &player_sprite_gfx, nullrsf, (SpriteCallback)oac_nullsub};
+    struct Template player_temp = {tag, tag, &opp_oam, (void*)trainer_frame_table, &player_sprite_gfx, nullrsf, (SpriteCallback)oac_nullsub};
 
     LoadCompressedSpriteSheetUsingHeap(&player_sprite_gfx);
     LoadCompressedSpritePaletteUsingHeap(&player_sprite_pal);
-    u8 objid = template_instanciate_forward_search(&player_temp, PLAYER_X_POS_SLIDE, 81, 0);
+    u8 objid = CreateSprite(&player_temp, PLAYER_X_POS_SLIDE, 81, 0);
     gSprites[objid].final_oam.obj_mode = 1;
     return objid;
 }
